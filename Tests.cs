@@ -87,6 +87,10 @@ namespace Tests
                 {
                     factory.AddConsole();
                 })
+                .ConfigureServices(services => 
+                {
+                    services.AddSingleton<ILogger<StartupWithLogging>(mockLogger.Object);
+                })
                 .UseStartup<StartupWithLogging>()
             );
             _client = _server.CreateClient();
