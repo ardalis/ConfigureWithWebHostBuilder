@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
-using Microsoft.Extensions.Logging.Console;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -78,20 +77,15 @@ namespace Tests
         }
 
         [Fact]
-        public async void TesMockingLogging() 
+        public async void TestAddingLoggingViaMethod() 
         {
-            var mockLogger = new Mock<ILogger<StartupWithLogging>>();
             _server = new TestServer(
                 new WebHostBuilder()
                 .ConfigureLogging(factory =>
                 {
                     factory.AddConsole();
                 })
-                .ConfigureServices(services => 
-                {
-                    services.AddSingleton<ILogger<StartupWithLogging>(mockLogger.Object);
-                })
-                .UseStartup<StartupWithLogging>()
+                .UseStartup<StartupWithLoggingPassedIntoMethod>()
             );
             _client = _server.CreateClient();
 
@@ -99,10 +93,8 @@ namespace Tests
             response.EnsureSuccessStatusCode();
             var result = await response.Content.ReadAsStringAsync();
 
-            Assert.Equal("Logging",result);
+            Assert.Equal("Logging via method injection",result);
         }
-
-
     }
 
     public class StartupWithGreeting
@@ -116,12 +108,23 @@ namespace Tests
         } 
     }
 
-        public class StartupWithLogging
+    public class StartupWithLogging
     {
-        public void Configure(IApplicationBuilder app,
-           ILogger<StartupWithLogging> logger)
+        private readonly ILogger<StartupWithLogging> _logger;
+        public StartupWithLogging(ILogger<StartupWithLogging> logger)
         {
-            logger.LogWarning("Entering Configure");
+        _logger = logger;
+        }
+
+        public void ConfigureServices(IServiceCollection services)
+        {
+            _logger.LogInformation("Starting ConfigureServices");
+            // do stuff here
+            _logger.LogInformation("Exiting ConfigureServices");        
+        }
+        public void Configure(IApplicationBuilder app)
+        {
+            _logger.LogWarning("Entering Configure");
             app.Run(async (context) =>
             {
                 await context.Response.WriteAsync("Logging");
@@ -129,6 +132,17 @@ namespace Tests
         } 
     }
 
+    public class StartupWithLoggingPassedIntoMethod
+    {
+            public void Configure(IApplicationBuilder app, ILogger<StartupWithLoggingPassedIntoMethod> logger)
+        {
+            logger.LogWarning("Entering Configure");
+            app.Run(async (context) =>
+            {
+                await context.Response.WriteAsync("Logging via method injection");
+            });
+        } 
+    }
 
     public interface IGreeting
     {
@@ -142,5 +156,4 @@ namespace Tests
             return $"Good morning, {name}!";
         }
     }
-
 }
